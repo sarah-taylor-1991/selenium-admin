@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Telegram Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            color: #fff;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .logo p {
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .form-group input::placeholder {
+            color: #999;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .login-btn:hover {
+            background: #0056b3;
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid #fcc;
+            display: none;
+        }
+
+        .ban-info {
+            background: #2d1b1b;
+            color: #ff6b6b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid #4a2c2c;
+            display: none;
+        }
+
+        .ban-info h4 {
+            margin: 0 0 0.5rem 0;
+            color: #ff6b6b;
+            font-size: 1rem;
+        }
+
+        .ban-details {
+            margin-top: 0.5rem;
+        }
+
+        .ban-details p {
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+        }
+
+        .ban-details strong {
+            color: #ff8a8a;
+        }
+
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 1px solid #cfc;
+            display: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+            color: #fff;
+        }
+
+        .spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            color: #999;
+            font-size: 0.8rem;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>Admin Login</h1>
+            <p>Telegram Manager Admin Panel</p>
+        </div>
+
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="ban-info" id="banInfo">
+            <h4>🚫 Account Banned</h4>
+            <div class="ban-details" id="banDetails"></div>
+        </div>
+        <div class="success-message" id="successMessage"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username or Email</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+
+            <button type="submit" class="login-btn" id="loginBtn">
+                Login
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Logging in...</p>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2024 Telegram Manager. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        const banInfo = document.getElementById('banInfo');
+        const banDetails = document.getElementById('banDetails');
+        const successMessage = document.getElementById('successMessage');
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            banInfo.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+
+        function showBanInfo(banData) {
+            let banDetailsHtml = '';
+            
+            if (banData.reason) {
+                banDetailsHtml += `<p><strong>Reason:</strong> ${banData.reason}</p>`;
+            }
+            
+            if (banData.duration) {
+                banDetailsHtml += `<p><strong>Duration:</strong> ${banData.duration}</p>`;
+            }
+            
+            if (banData.expiresAt) {
+                const expireDate = new Date(banData.expiresAt);
+                const now = new Date();
+                
+                if (banData.duration === 'permanent') {
+                    banDetailsHtml += `<p><strong>Status:</strong> Permanent ban</p>`;
+                } else if (expireDate > now) {
+                    const timeLeft = Math.ceil((expireDate - now) / (1000 * 60 * 60 * 24));
+                    banDetailsHtml += `<p><strong>Expires:</strong> ${expireDate.toLocaleDateString()} (${timeLeft} day${timeLeft !== 1 ? 's' : ''} remaining)</p>`;
+                } else {
+                    banDetailsHtml += `<p><strong>Status:</strong> Ban has expired</p>`;
+                }
+            }
+            
+            if (banData.bannedAt) {
+                const banDate = new Date(banData.bannedAt);
+                banDetailsHtml += `<p><strong>Banned on:</strong> ${banDate.toLocaleDateString()}</p>`;
+            }
+            
+            banDetails.innerHTML = banDetailsHtml;
+            banInfo.style.display = 'block';
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+            banInfo.style.display = 'none';
+        }
+
+        function hideMessages() {
+            errorMessage.style.display = 'none';
+            banInfo.style.display = 'none';
+            successMessage.style.display = 'none';
+        }
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                loginBtn.disabled = true;
+                loading.style.display = 'block';
+                loginForm.style.display = 'none';
+            } else {
+                loginBtn.disabled = false;
+                loading.style.display = 'none';
+                loginForm.style.display = 'block';
+            }
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                showError('Please enter both username and password');
+                return;
+            }
+
+            hideMessages();
+            setLoading(true);
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store token in localStorage
+                    localStorage.setItem('authToken', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    showSuccess('Login successful! Redirecting...');
+                    
+                    // Redirect to main admin panel
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    // Check if it's a ban error
+                    if (data.banInfo) {
+                        showBanInfo(data.banInfo);
+                    } else {
+                        showError(data.error || 'Login failed');
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Network error. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // Check if user is already logged in
+        window.addEventListener('load', async () => {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                try {
+                    const response = await fetch('/api/auth/me', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        // User is already logged in, redirect to main page
+                        window.location.href = '/';
+                    } else {
+                        // Token is invalid, remove it
+                        localStorage.removeItem('authToken');
+                        localStorage.removeItem('user');
+                    }
+                } catch (error) {
+                    // Network error, remove token
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('user');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

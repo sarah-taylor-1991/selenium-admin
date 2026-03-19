@@ -1,0 +1,13 @@
+node_modules
+storage
+/generated/prisma
+.envtemp/
+.env
+/temp
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+prisma/dev.db
+server.log
