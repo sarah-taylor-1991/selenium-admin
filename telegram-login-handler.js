@@ -64,9 +64,13 @@ async function runTelegramLogin(sessionId, parameters, progressCallback) {
     const chrome = require('selenium-webdriver/chrome');
     const options = new chrome.Options();
 
-    // Ensure Chrome opens in visible mode (not headless)
+    // Headless mode required for containerized environments (Railway, Docker)
+    options.addArguments('--headless=new');
     options.addArguments('--no-sandbox');
     options.addArguments('--disable-dev-shm-usage');
+    options.addArguments('--disable-gpu');
+    options.addArguments('--window-size=1920,1080');
+    options.addArguments('--remote-debugging-port=9222');
 
     // Disable permission prompts (including local network access)
     options.addArguments('--disable-notifications');
@@ -90,9 +94,6 @@ async function runTelegramLogin(sessionId, parameters, progressCallback) {
       'profile.default_content_setting_values.insecure_private_network': 2,
       'profile.managed_default_content_settings.local_discovery': 2,
     });
-
-    // Remove headless mode if it was set
-    options.excludeSwitches(['--headless']);
 
     console.log('Chrome options configured');
 
