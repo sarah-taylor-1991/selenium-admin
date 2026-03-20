@@ -58,11 +58,7 @@ RUN npx prisma generate
 
 COPY . .
 
-# Create data directory for SQLite persistent volume
-RUN mkdir -p /data
-
 ENV NODE_ENV=production
-ENV DATABASE_URL=file:/data/prod.db
 ENV PORT=3000
 
 EXPOSE 3000

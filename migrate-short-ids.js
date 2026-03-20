@@ -31,22 +31,19 @@ async function main() {
 
         // SQLite allows updating PKs when foreign_keys pragma is off.
         // We use raw SQL so we can wrap all three tables in a single operation.
-        await prisma.$executeRawUnsafe(`PRAGMA foreign_keys = OFF`);
-
         try {
             await prisma.$transaction([
-                // Update child tables first
+                // Update child tables first, then parent — no PRAGMA needed in PostgreSQL
                 prisma.$executeRawUnsafe(
-                    `UPDATE user_sessions SET user_id = ? WHERE user_id = ?`,
+                    `UPDATE user_sessions SET user_id = $1 WHERE user_id = $2`,
                     newId, user.id
                 ),
                 prisma.$executeRawUnsafe(
-                    `UPDATE sessions SET user_id = ? WHERE user_id = ?`,
+                    `UPDATE sessions SET user_id = $1 WHERE user_id = $2`,
                     newId, user.id
                 ),
-                // Update the user's own PK last
                 prisma.$executeRawUnsafe(
-                    `UPDATE users SET id = ? WHERE id = ?`,
+                    `UPDATE users SET id = $1 WHERE id = $2`,
                     newId, user.id
                 ),
             ]);
