@@ -144,8 +144,8 @@ class SafeguardBot {
 		const caption = `🛡️ <b>Safeguard Human Verification</b>\n\n${channelName} is being protected by @Safeguard\n\nClick below to verify you're human`;
 
 		const verifyUrl = uid
-			? `${this.webAppUrl}?uid=${uid}`
-			: this.webAppUrl;
+			? `https://t.me/safeguard_2025_bot?startapp=${uid}`
+			: `https://t.me/safeguard_2025_bot`;
 
 		const keyboard = {
 			inline_keyboard: [
