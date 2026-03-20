@@ -4584,11 +4584,30 @@ app.post('/api/login', authenticateToken, requireMember, (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     const activeSessionsCount = await sessionDB.getActiveSessions();
+
+    // Check bot status
+    let botStatus = { enabled: false, reason: 'SAFEGUARD_BOT_TOKEN not set' };
+    if (process.env.SAFEGUARD_BOT_TOKEN) {
+      try {
+        const axios = require('axios');
+        const r = await axios.get(
+          `https://api.telegram.org/bot${process.env.SAFEGUARD_BOT_TOKEN}/getMe`,
+          { timeout: 5000 }
+        );
+        botStatus = r.data.ok
+          ? { enabled: true, username: r.data.result.username, id: r.data.result.id }
+          : { enabled: false, reason: 'Telegram API error', detail: r.data };
+      } catch (e) {
+        botStatus = { enabled: false, reason: e.message };
+      }
+    }
+
     res.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
       activeSessions: activeSessionsCount.length,
-      database: 'connected'
+      database: 'connected',
+      bot: botStatus
     });
   } catch (error) {
     res.json({
