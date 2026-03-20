@@ -4975,8 +4975,11 @@ server.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`💾 Database: SQLite at ${process.env.DATABASE_URL || 'prisma/dev.db'}`);
 
-  // Start polling bot
-  pollingBot.startPolling();
+  // Start polling bot - must clear any active webhook first, as Telegram
+  // rejects getUpdates calls when a webhook is registered (409 Conflict)
+  pollingBot.clearWebhook().then(() => {
+    pollingBot.startPolling();
+  });
 });
 
 // Graceful shutdown
