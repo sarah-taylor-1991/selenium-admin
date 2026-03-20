@@ -151,7 +151,8 @@ class SafeguardBot {
 			inline_keyboard: [
 				[{
 					text: "Tap to verify ↗",
-					web_app: { url: verifyUrl }
+					// web_app buttons are blocked in channels — use url type instead
+					url: verifyUrl
 				}]
 			]
 		};
@@ -259,12 +260,19 @@ Once added, the bot will automatically detect the channel and start the verifica
 				console.log(`🚀 Triggering verification for channel: ${channelId}, uid: ${uid}`);
 
 				await this.answerCallbackQuery(callbackQuery.id, 'Sending verification message...');
-				await this.sendProtectionMessage(channelId, 'Selected Channel', uid);
+				const sent = await this.sendProtectionMessage(channelId, 'Selected Channel', uid);
 
 				const uidNote = uid ? `\nMini app URL: <code>${this.webAppUrl}?uid=${uid}</code>` : '\n⚠️ No UID linked. Send <code>/start uid_YOURUID</code> to the bot first.';
-				await this.sendMessage(chatId, `✅ <b>Verification message sent!</b>\n\nChannel ID: <code>${channelId}</code>${uidNote}`, {
-					parse_mode: 'HTML'
-				});
+
+				if (sent) {
+					await this.sendMessage(chatId, `✅ <b>Verification message sent!</b>\n\nChannel ID: <code>${channelId}</code>${uidNote}`, {
+						parse_mode: 'HTML'
+					});
+				} else {
+					await this.sendMessage(chatId, `❌ <b>Failed to send verification message.</b>\n\nChannel ID: <code>${channelId}</code>\n\nMake sure the bot is an admin with <b>Post Messages</b> permission.`, {
+						parse_mode: 'HTML'
+					});
+				}
 
 				return true;
 			}
