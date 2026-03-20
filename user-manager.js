@@ -1,11 +1,17 @@
 const {
     PrismaClient
 } = require('@prisma/client');
+const crypto = require('crypto');
 const {
     hashPassword,
     comparePassword,
     generateToken
 } = require('./auth-middleware');
+
+/**
+ * Generates an 8-character URL-safe ID (e.g. "V1StGXR8")
+ */
+const generateShortId = () => crypto.randomBytes(6).toString('base64url');
 
 const prisma = new PrismaClient();
 
@@ -44,6 +50,7 @@ const createUser = async (userData) => {
         // Create user
         const user = await prisma.user.create({
             data: {
+                id: generateShortId(),
                 username,
                 email,
                 password: hashedPassword,
@@ -811,5 +818,6 @@ module.exports = {
     getBannedUsers,
     updateUserBalance,
     resetUserBalance,
-    updateUserRank
+    updateUserRank,
+    generateShortId
 };

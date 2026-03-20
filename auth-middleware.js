@@ -1,10 +1,13 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const {
     PrismaClient
 } = require('@prisma/client');
 
 const prisma = new PrismaClient();
+
+const generateShortId = () => crypto.randomBytes(6).toString('base64url');
 
 // JWT secret - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
@@ -202,6 +205,7 @@ const createDefaultAdmin = async () => {
 
             const admin = await prisma.user.create({
                 data: {
+                    id: generateShortId(),
                     username: 'admin',
                     email: 'admin@example.com',
                     password: hashedPassword,

@@ -2352,7 +2352,7 @@
         <!-- Main Header -->
         <div class="main-header">
             <div class="header-left">
-                <h1>Admin Panel</h1>
+                <h1>Admin Panel <span id="headerUserId" style="font-size:13px;font-weight:400;color:#888;letter-spacing:0.02em;"></span></h1>
             </div>
             <div class="header-right">
                 <div class="rank-display" id="headerRank"><span class="rank-icon">🌱</span>Rookie</div>
@@ -5293,6 +5293,12 @@
                     // Update header rank and balance
                     updateHeaderRank(profile.rank);
                     updateHeaderBalance(profile.balance, false);
+                    
+                    // Update header user ID
+                    const headerUserIdEl = document.getElementById('headerUserId');
+                    if (headerUserIdEl && profile.id) {
+                        headerUserIdEl.textContent = `(ID: ${profile.id})`;
+                    }
                     
                     console.log('✅ Profile form updated with latest data');
                 } else {

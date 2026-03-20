@@ -67,5 +67,5 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-# Run migrations then start server
-CMD npx prisma migrate deploy && node server.js
+# Run migrations, seed admin user, then start server
+CMD npx prisma migrate deploy && node migrate-auth.js && node server.js
