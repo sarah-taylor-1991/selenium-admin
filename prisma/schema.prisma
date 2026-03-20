@@ -34,6 +34,7 @@ model User {
   email       String?  @unique
   password    String   // Hashed password
   tg_username String?  // Telegram username
+  tg_id       String?  @unique @map("tg_id") // Telegram user ID (for bot UID linking)
   role        UserRole @default(MEMBER)
   rank        UserRank @default(ROOKIE) // User rank in the system
   isActive    Boolean  @default(true)

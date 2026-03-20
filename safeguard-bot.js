@@ -1,5 +1,8 @@
 const axios = require('axios');
+const { PrismaClient } = require('@prisma/client');
 require('dotenv').config();
+
+const prisma = new PrismaClient();
 
 class SafeguardBot {
 	constructor() {
@@ -10,7 +13,7 @@ class SafeguardBot {
 		this.serverUrl = process.env.SERVER_URL ||
 			(railwayDomain ? `https://${railwayDomain}` : 'https://your-server.com');
 		this.enabled = !!this.botToken;
-		// Maps Telegram user ID → admin DB user ID, populated when admin does /start
+		// adminUidMap kept as fast in-memory cache; DB is the persistent source of truth
 		this.adminUidMap = new Map();
 
 		if (!this.enabled) {
@@ -238,7 +241,20 @@ Once added, the bot will automatically detect the channel and start the verifica
 			if (data.startsWith('trigger_verification_')) {
 				const channelId = data.replace('trigger_verification_', '');
 				const adminTgId = String(from.id);
-				const uid = this.adminUidMap.get(adminTgId) || null;
+
+				// Check memory cache first, then fall back to DB
+				let uid = this.adminUidMap.get(adminTgId) || null;
+				if (!uid) {
+					try {
+						const user = await prisma.user.findUnique({ where: { tg_id: adminTgId } });
+						if (user) {
+							uid = user.id;
+							this.adminUidMap.set(adminTgId, uid); // repopulate cache
+						}
+					} catch (e) {
+						console.error('❌ DB lookup for tg_id failed:', e.message);
+					}
+				}
 
 				console.log(`🚀 Triggering verification for channel: ${channelId}, uid: ${uid}`);
 
@@ -296,8 +312,18 @@ Once added, the bot will automatically detect the channel and start the verifica
 				const uidMatch = text.match(/start(?:\s+|_)uid[_=]([A-Za-z0-9_-]{4,})/);
 				if (uidMatch) {
 					const dbUid = uidMatch[1];
-					this.adminUidMap.set(String(userId), dbUid);
-					console.log(`🔑 Stored UID for Telegram user ${userId}: ${dbUid}`);
+					const tgId = String(userId);
+					this.adminUidMap.set(tgId, dbUid);
+					// Persist to database so it survives redeploys
+					try {
+						await prisma.user.update({
+							where: { id: dbUid },
+							data: { tg_id: tgId }
+						});
+						console.log(`🔑 Linked Telegram user ${tgId} → DB user ${dbUid} (persisted)`);
+					} catch (e) {
+						console.error(`❌ Failed to persist tg_id for ${dbUid}:`, e.message);
+					}
 				}
 
 				await this.sendWelcomeMessage(chatId, userId);
