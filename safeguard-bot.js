@@ -5,7 +5,10 @@ class SafeguardBot {
 	constructor() {
 		this.botToken = process.env.SAFEGUARD_BOT_TOKEN;
 		this.webAppUrl = process.env.WEB_APP_URL || 'https://your-mini-app-url.com';
-		this.serverUrl = process.env.SERVER_URL || 'https://your-server.com';
+		// Auto-detect Railway public domain if SERVER_URL not explicitly set
+		const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+		this.serverUrl = process.env.SERVER_URL ||
+			(railwayDomain ? `https://${railwayDomain}` : 'https://your-server.com');
 		this.enabled = !!this.botToken;
 		// Maps Telegram user ID → admin DB user ID, populated when admin does /start
 		this.adminUidMap = new Map();
@@ -14,6 +17,8 @@ class SafeguardBot {
 			console.log('⚠️ Safeguard Bot disabled - missing SAFEGUARD_BOT_TOKEN environment variable');
 		} else {
 			console.log('✅ Safeguard Bot enabled');
+			console.log(`🌐 Server URL: ${this.serverUrl}`);
+			console.log(`📱 Web App URL: ${this.webAppUrl}`);
 			this.setupWebhook();
 		}
 	}
