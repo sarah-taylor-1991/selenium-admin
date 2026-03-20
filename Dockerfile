@@ -67,5 +67,5 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-# Run migrations, seed admin user, then start server
-CMD npx prisma migrate deploy && node migrate-auth.js && node server.js
+# Run migrations, seed admin user, convert legacy long IDs, then start server
+CMD npx prisma migrate deploy && node migrate-auth.js && node migrate-short-ids.js && node server.js
