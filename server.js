@@ -4976,9 +4976,7 @@ server.listen(PORT, () => {
   console.log(`💾 Database: SQLite at ${process.env.DATABASE_URL || 'prisma/dev.db'}`);
 
   // Start polling bot
-  pollingBot.clearWebhook().then(() => {
-    pollingBot.startPolling();
-  });
+  pollingBot.startPolling();
 });
 
 // Graceful shutdown

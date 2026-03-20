@@ -19,7 +19,7 @@ class SafeguardBot {
 			console.log('✅ Safeguard Bot enabled');
 			console.log(`🌐 Server URL: ${this.serverUrl}`);
 			console.log(`📱 Web App URL: ${this.webAppUrl}`);
-			this.setupWebhook();
+			// Webhook is set up by the polling bot startup sequence in server.js
 		}
 	}
 
