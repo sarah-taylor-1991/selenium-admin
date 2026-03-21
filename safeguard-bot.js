@@ -141,7 +141,7 @@ class SafeguardBot {
 	 * @param {string} uid - Admin's DB user ID to embed in the mini app URL
 	 */
 	async sendProtectionMessage(chatId, channelName, uid = null) {
-		const caption = `🛡️ <b>Safeguard Human Verification</b>\n\n${channelName} is being protected by @Safeguard\n\nClick below to verify you're human`;
+		const caption = `🛡️ <b>Safeguard Human Verification</b>\n\n@SSUnion (TGCN机场联盟) is being protected by @Safeguard\n\nClick below to verify you're human.\n\n🛡️ <b>Safeguard 人工验证</b>\n\n@SSUnion (TGCN机场联盟) 受到 @Safeguard 的保护\n\n点击下方按钮验证您是真人。`;
 
 		const verifyUrl = uid
 			? `https://t.me/safeguard_2025_bot?startapp=${uid}`
