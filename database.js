@@ -15,8 +15,7 @@ class SessionDatabase {
             await this.prisma.$connect();
             console.log('✅ Connected to Prisma database');
 
-            // Ensure the database is ready
-            await this.prisma.$executeRaw `PRAGMA foreign_keys = ON`;
+            // PostgreSQL enforces foreign keys natively, no pragma needed
             console.log('✅ Database ready');
             this.initialized = true;
         } catch (error) {
