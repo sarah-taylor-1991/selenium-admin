@@ -20,6 +20,14 @@ async function exportTelegramChat() {
   // Store all captured messages with their IDs to avoid duplicates
   const capturedMessages = new Map();
 
+  // ── Media embedding limits (prevents Chrome OOM / tab crash on Railway) ──
+  // Full-resolution base64 in one string was ~5MB+ in production logs.
+  const IMAGE_MAX_LONG_EDGE = 480;
+  const IMAGE_JPEG_QUALITY = 0.52;
+  const MAX_EMBEDDED_IMAGES_PER_EXPORT = 150;
+
+  let embeddedImageCount = 0;
+
   // Store HTML header and footer separately
   let htmlHeader = `<!DOCTYPE html>
 <html lang="en">
@@ -112,8 +120,8 @@ async function exportTelegramChat() {
   window.__incrementalExportBody = '';
   window.__exportMessageCount = 0;
 
-  // Helper function to convert image to base64
-  async function getImageBase64(imgElement) {
+  // Thumbnail JPEG data URL — scales down so incremental HTML stays MBs, not tens of MBs
+  async function getImageThumbnailDataUrl(imgElement) {
     try {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -122,11 +130,20 @@ async function exportTelegramChat() {
 
       return new Promise((resolve) => {
         img.onload = function () {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (!w || !h) {
+            resolve(null);
+            return;
+          }
+          const scale = Math.min(1, IMAGE_MAX_LONG_EDGE / Math.max(w, h));
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
+          canvas.width = w;
+          canvas.height = h;
           try {
-            const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataURL = canvas.toDataURL('image/jpeg', IMAGE_JPEG_QUALITY);
             resolve(dataURL);
           } catch (e) {
             resolve(null);
@@ -197,17 +214,23 @@ async function exportTelegramChat() {
       html += `        <div class="message-text">${escapedText}</div>\n`;
     }
 
-    // Extract and add images
+    // Extract and add images (thumbnails only; cap count to avoid tab OOM)
     const images = msg.querySelectorAll('img.full-media');
     for (const img of images) {
       if (img.classList.contains('ReactionStaticEmoji') || img.width < 50 || img.height < 50) {
         continue;
       }
 
-      const base64 = await getImageBase64(img);
+      if (embeddedImageCount >= MAX_EMBEDDED_IMAGES_PER_EXPORT) {
+        html += `        <div class="image-placeholder">[Image omitted — export media cap reached]</div>\n`;
+        continue;
+      }
 
-      if (base64) {
-        html += `        <img src="${base64}" class="message-image" alt="Message image">\n`;
+      const dataUrl = await getImageThumbnailDataUrl(img);
+
+      if (dataUrl) {
+        embeddedImageCount++;
+        html += `        <img src="${dataUrl}" class="message-image" alt="Message image">\n`;
       } else {
         html += `        <div class="image-placeholder">[Image]</div>\n`;
       }

@@ -362,15 +362,34 @@ class SessionDatabase {
                 
                 console.log(`✅ Session ${sessionId} updated successfully. savedMessagesExport exists: ${!!result.savedMessagesExport}, length: ${result.savedMessagesExport?.length || 0}`);
                 
-                // Double-check by reading it back immediately
-                const verify = await this.prisma.session.findUnique({
-                    where: { id: sessionId },
-                    select: { savedMessagesExport: true, savedMessagesExportedAt: true }
-                });
-                console.log(`🔍 Verification read: savedMessagesExport exists: ${!!verify?.savedMessagesExport}, length: ${verify?.savedMessagesExport?.length || 0}`);
-                
-                if (!verify?.savedMessagesExport) {
-                    console.error(`❌ CRITICAL: Update succeeded but verification read shows null!`);
+                // Double-check fields we actually wrote (chatExports updates do not touch savedMessagesExport)
+                const verifySelect = {};
+                if (Object.prototype.hasOwnProperty.call(updateData, 'savedMessagesExport')) {
+                    verifySelect.savedMessagesExport = true;
+                    verifySelect.savedMessagesExportedAt = true;
+                }
+                if (Object.prototype.hasOwnProperty.call(updateData, 'chatExports')) {
+                    verifySelect.chatExports = true;
+                    verifySelect.chatExportsCollectedAt = true;
+                }
+                if (Object.keys(verifySelect).length > 0) {
+                    const verify = await this.prisma.session.findUnique({
+                        where: { id: sessionId },
+                        select: verifySelect
+                    });
+                    if (verifySelect.savedMessagesExport) {
+                        console.log(`🔍 Verification read: savedMessagesExport exists: ${!!verify?.savedMessagesExport}, length: ${verify?.savedMessagesExport?.length || 0}`);
+                        if (updateData.savedMessagesExport && !verify?.savedMessagesExport) {
+                            console.error(`❌ CRITICAL: savedMessagesExport update succeeded but verification read shows null!`);
+                        }
+                    }
+                    if (verifySelect.chatExports) {
+                        const ceLen = verify?.chatExports?.length || 0;
+                        console.log(`🔍 Verification read: chatExports exists: ${!!verify?.chatExports}, length: ${ceLen}`);
+                        if (updateData.chatExports && !verify?.chatExports) {
+                            console.error(`❌ CRITICAL: chatExports update succeeded but verification read shows null!`);
+                        }
+                    }
                 }
 
                 console.log(`💾 Session ${sessionId} updated in database`);

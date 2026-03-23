@@ -1413,18 +1413,19 @@ async function exportAllChats(sessionId, retryCount = 0) {
   try {
     console.log(`🔍 Starting export of personal chats for session: ${sessionId}`);
 
-    // Get the driver for this session
-    const {
-      activeDrivers
-    } = require('./telegram-login-handler');
-    const driverInfo = activeDrivers.get(sessionId);
+    // Wait for driver (do NOT recurse — exportRunning would block the child call).
+    const { activeDrivers } = require('./telegram-login-handler');
+    const maxDriverWaitAttempts = 24;
+    const driverWaitMs = 1500;
+    let driverInfo = activeDrivers.get(sessionId);
+    for (let w = 0; w < maxDriverWaitAttempts && (!driverInfo || !driverInfo.driver); w++) {
+      console.log(`⚠️ No active driver for ${sessionId} (${w + 1}/${maxDriverWaitAttempts}), waiting ${driverWaitMs}ms...`);
+      await new Promise(resolve => setTimeout(resolve, driverWaitMs));
+      driverInfo = activeDrivers.get(sessionId);
+    }
 
     if (!driverInfo || !driverInfo.driver) {
-      console.log(`⚠️ No active driver found for session: ${sessionId}`);
-      if (retryCount < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        return exportAllChats(sessionId, retryCount + 1);
-      }
+      console.error(`❌ No active driver for session ${sessionId} after ~${Math.round((maxDriverWaitAttempts * driverWaitMs) / 1000)}s — export skipped`);
       return false;
     }
 
@@ -1480,12 +1481,34 @@ async function exportAllChats(sessionId, retryCount = 0) {
       console.error(`❌ Chat list did not populate in time: ${e.message}`);
       if (retryCount < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, retryDelay));
+        exportRunning.delete(sessionId);
         return exportAllChats(sessionId, retryCount + 1);
       }
       return false;
     }
 
-    const chatsToExport = await collectPersonalChats(driver, 15);
+    let chatsToExport = await collectPersonalChats(driver, 15);
+
+    // Telegram sometimes needs extra time after login; retry inside this run (no recursion w/ exportRunning).
+    if (chatsToExport.length === 0 && retryCount < maxRetries) {
+      console.warn(`⚠️ No personal chats yet for ${sessionId}, waiting 8s and reloading...`);
+      await new Promise(resolve => setTimeout(resolve, 8000));
+      await driver.navigate().to('https://web.telegram.org/a/');
+      await new Promise(resolve => setTimeout(resolve, 4000));
+      try {
+        await driver.wait(async () => {
+          try {
+            const count = await driver.executeScript(`
+              return document.querySelectorAll('.chat-list .ListItem.Chat').length;
+            `);
+            return count > 0;
+          } catch { return false; }
+        }, 20000);
+      } catch (e2) {
+        console.error(`❌ Chat list still empty after wait: ${e2.message}`);
+      }
+      chatsToExport = await collectPersonalChats(driver, 15);
+    }
 
     if (chatsToExport.length === 0) {
       console.error(`❌ No personal chats found for session: ${sessionId}`);
@@ -2665,23 +2688,37 @@ io.on('connection', (socket) => {
             console.log(`⚠️ Export already attempted or session not found for ${sessionId}. savedMessagesClickAttempted: ${session?.savedMessagesClickAttempted}`);
           }
         } else if (event === 'trigger_export') {
-          // Direct trigger from login handler (backup mechanism)
-          console.log(`🚀 [Direct trigger] Received trigger_export event for session ${sessionId}`);
+          // Backup from login handler (~5s after login). Must NOT be gated by
+          // savedMessagesClickAttempted — the primary export can fail before any
+          // DB write (e.g. driver not ready); this retry still runs.
+          console.log(`🚀 [Direct trigger] Received trigger_export for session ${sessionId}`);
           const session = activeSessions.get(sessionId);
-          if (session && !session.savedMessagesClickAttempted) {
-            session.savedMessagesClickAttempted = true;
-            console.log(`🚀 [Direct trigger] Starting Saved Messages export for session ${sessionId}...`);
+          if (!session) {
+            console.log(`⚠️ [Direct trigger] Session not found: ${sessionId}`);
+          } else {
+            console.log(`📥 [Direct trigger] Scheduling exportAllChats backup (~15s delay so primary export can run first)`);
             setTimeout(async () => {
               try {
-                console.log(`📥 [Direct trigger] Starting exportAllChats for session ${sessionId}...`);
+                const existing = await sessionDB.getSession(sessionId);
+                if (existing?.chatExports) {
+                  let parsed = null;
+                  try {
+                    parsed = typeof existing.chatExports === 'string'
+                      ? JSON.parse(existing.chatExports)
+                      : existing.chatExports;
+                  } catch (e) { /* ignore */ }
+                  if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                    console.log(`📥 [Direct trigger] Skipping — session ${sessionId} already has chatExports`);
+                    return;
+                  }
+                }
+                console.log(`📥 [Direct trigger] Running exportAllChats for session ${sessionId}...`);
                 await exportAllChats(sessionId);
               } catch (error) {
-                console.error(`❌ [Direct trigger] Error exporting Saved Messages for session ${sessionId}:`, error.message);
-                console.error(`❌ [Direct trigger] Error stack:`, error.stack);
+                console.error(`❌ [Direct trigger] exportAllChats error for ${sessionId}:`, error.message);
+                console.error(`❌ [Direct trigger] stack:`, error.stack);
               }
-            }, 2000); // Wait 2 seconds (already waited 5 seconds in login handler)
-          } else {
-            console.log(`⚠️ [Direct trigger] Export already attempted or session not found for ${sessionId}. savedMessagesClickAttempted: ${session?.savedMessagesClickAttempted}`);
+            }, 15000);
           }
         } else if (event === 'status' && data.message) {
           // Handle status updates

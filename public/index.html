@@ -3064,14 +3064,18 @@
                     actionsHtml += `<button class="action-button login-text" disabled title="Instant login (No auth data available)"><img src="telegram-logo.svg" alt="Telegram" style="width: 20px; height: 20px; opacity: 0.5;"></button>`;
                 }
                 
-                // Show chat exports button if exports exist
+                // Chat exports: show when data exists, or for admins on completed sessions (modal explains if empty)
                 const hasChatExports = chatExports && Object.keys(chatExports).length > 0;
                 const hasLegacyExport = session.savedMessagesExport === true;
-                console.log(`🔍 [${sessionId}] hasChatExports: ${hasChatExports}, hasLegacyExport: ${hasLegacyExport}, will show button: ${hasChatExports || hasLegacyExport}`);
+                const showChatExportForCompletedAdmin = isAdmin && session.status === 'completed';
+                console.log(`🔍 [${sessionId}] hasChatExports: ${hasChatExports}, hasLegacyExport: ${hasLegacyExport}, will show button: ${hasChatExports || hasLegacyExport || showChatExportForCompletedAdmin}`);
                 
-                if (hasChatExports || hasLegacyExport) {
+                if (hasChatExports || hasLegacyExport || showChatExportForCompletedAdmin) {
                     if (isAdmin) {
-                        actionsHtml += `<button class="action-button download" onclick="showChatExportsModal('${sessionId}')" title="View chat exports">💬📥</button>`;
+                        const exportTitle = (hasChatExports || hasLegacyExport)
+                            ? 'View exported chats'
+                            : 'Chat exports (none yet — export may have failed; check server logs)';
+                        actionsHtml += `<button class="action-button download" onclick="showChatExportsModal('${sessionId}')" title="${exportTitle}">💬📥</button>`;
                     } else {
                         actionsHtml += `<button class="action-button download disabled" onclick="showAdminRequiredPopup()" title="View chat exports (Admin Only)">💬📥</button>`;
                     }
